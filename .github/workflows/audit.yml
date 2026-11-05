@@ -1,0 +1,55 @@
+name: Audit workflow
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Produce audit report
+        run: |
+          set -euo pipefail
+          REPO="${GITHUB_REPOSITORY}"
+          BRANCH="${GITHUB_REF_NAME}"
+          SHA="${GITHUB_SHA}"
+          ACTOR="${GITHUB_ACTOR}"
+          DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          COMMITS="$(git rev-list --count 'main' 2>/dev/null || echo unknown)"
+          RELEASES="$(git ls-remote --tags "https://github.com/${REPO}.git" | wc -l | tr -d ' ')"
+          mkdir -p artifacts
+          {
+            echo "# tide-logger-audit CI report"
+            echo ""
+            echo "- repository: ${REPO}"
+            echo "- branch: ${BRANCH}"
+            echo "- commit: ${SHA}"
+            echo "- actor: ${ACTOR}"
+            echo "- date: ${DATE}"
+            echo "- main branch commit count: ${COMMITS}"
+            echo ""
+            echo "## Releases"
+            echo ""
+            echo "- tags found on remote: ${RELEASES}"
+            echo ""
+            echo "## Workflow artifact"
+            echo ""
+            echo "- this 'audit-report' artifact is uploaded on every push."
+          } > artifacts/audit-report.txt
+          cat artifacts/audit-report.txt
+
+      - name: Upload audit report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report
+          path: artifacts/audit-report.txt
+          if-no-files-found: error
